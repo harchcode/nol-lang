@@ -1,0 +1,4 @@
+CMakePresets.json
+out/
+.vscode/*
+!.vscode/settings.json
