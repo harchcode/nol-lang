@@ -9,24 +9,27 @@
 int32_t stack[STACK_MAX];
 int32_t* top;
 
-void reset_stack() { top = stack - 1; }
+void reset_stack() { top = stack; }
 
 void push(int32_t value) {
-  top++;
   *top = value;
+  top++;
 }
 
-void pop() { top--; }
+int32_t pop() {
+  top--;
+  return *top;
+}
 
 void init_vm() { reset_stack(); }
 void free_vm() {}
 
 bool run_code(uint8_t* code) {
-#define BINARY_OP(op) \
-  do {                \
-    int32_t b = *top; \
-    pop();            \
-    *top = *top op b; \
+#define BINARY_OP(op)  \
+  do {                 \
+    int32_t b = pop(); \
+    int32_t a = pop(); \
+    push(a op b);      \
   } while (false)
 
   uint8_t* ip = code;
@@ -34,7 +37,7 @@ bool run_code(uint8_t* code) {
   while (true) {
 #ifdef DEBUG_TRACE_EXECUTION
     printf("          ");
-    for (int32_t* slot = stack; slot <= top; slot++) {
+    for (int32_t* slot = stack; slot < top; slot++) {
       printf("[ ");
       printf("%d", *slot);
       printf(" ]");
@@ -72,12 +75,11 @@ bool run_code(uint8_t* code) {
         BINARY_OP(/);
         break;
       case OP_NEGATE:
-        *top = -*top;
+        push(-pop());
 
         break;
       case OP_RETURN: {
-        int32_t value = *top;
-        pop();
+        int32_t value = pop();
 
         printf("%d\n", value);
 
