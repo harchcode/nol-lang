@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bytecode.h"
 #include "common.h"
 #include "compiler.h"
 
@@ -58,6 +59,8 @@ void run_file(const char* path) {
 }
 
 int main(int argc, char** argv) {
+  init_code();
+
   if (argc == 1) {
     repl();
   } else if (argc == 2) {

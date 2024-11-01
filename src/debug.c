@@ -4,7 +4,7 @@
 
 #include "bytecode.h"
 
-void log_program() {
+void log_code() {
   uint8_t* code = get_code();
   int size = get_code_size();
   int offset = 0;
@@ -21,9 +21,9 @@ void log_simple(const char* name, int* offset) {
 }
 
 void log_constant(const char* name, uint8_t* code, int* offset) {
-  int value;
+  int32_t value;
 
-  memcpy(&value, &code[*offset + 1], sizeof(int));
+  memcpy(&value, &code[*offset + 1], sizeof(int32_t));
 
   printf("%-16s %d\n", name, value);
 

@@ -17,6 +17,8 @@ void init_code();
 void free_code();
 uint8_t* get_code();
 int get_code_size();
+void reserve_code(int size);
 void write_code(uint8_t byte);
+void write_value(void* src, int size);
 
 #endif

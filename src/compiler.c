@@ -1,226 +1,254 @@
 #include "compiler.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
+#include "bytecode.h"
 #include "common.h"
+#include "debug.h"
 #include "scanner.h"
 
-// typedef enum {
-//   PREC_NONE,
-//   PREC_ASSIGNMENT,  // =
-//   PREC_OR,          // or
-//   PREC_AND,         // and
-//   PREC_EQUALITY,    // == !=
-//   PREC_COMPARISON,  // < > <= >=
-//   PREC_TERM,        // + -
-//   PREC_FACTOR,      // * /
-//   PREC_UNARY,       // ! -
-//   PREC_CALL,        // . ()
-//   PREC_PRIMARY
-// } Prec;
+typedef enum {
+  PREC_NONE,
+  PREC_ASSIGNMENT,  // =
+  PREC_OR,          // or
+  PREC_AND,         // and
+  PREC_EQUALITY,    // == !=
+  PREC_COMPARISON,  // < > <= >=
+  PREC_TERM,        // + -
+  PREC_FACTOR,      // * /
+  PREC_UNARY,       // ! -
+  PREC_CALL,        // . ()
+  PREC_PRIMARY
+} Prec;
 
-// typedef void (*ParseFn)();
+typedef void (*ParseFn)();
 
-// typedef struct {
-//   ParseFn prefix;
-//   ParseFn infix;
-//   Prec precedence;
-// } ParseRule;
+typedef struct {
+  ParseFn prefix;
+  ParseFn infix;
+  Prec precedence;
+} ParseRule;
 
-// typedef struct {
-//   Token token;
+typedef struct {
+  Token token;
 
-//   const char* start;
-//   const char* end;
-//   int line;
-// } ParseInfo;
+  const char* start;
+  const char* end;
+  int line;
+} ParseInfo;
 
-// typedef struct {
-//   ParseInfo current;
-//   ParseInfo previous;
+typedef struct {
+  ParseInfo current;
+  ParseInfo previous;
 
-//   bool had_error;
-//   bool panic_mode;
-// } Parser;
+  bool had_error;
+  bool panic_mode;
+} Parser;
 
-// typedef uint8_t* Program;
+Parser parser;
 
-// Parser parser;
-// Program code;
+static ParseRule* get_rule(Token type);
 
-// static ParseRule* get_rule(Token type);
+void error_at(ParseInfo* info, const char* message) {
+  if (parser.panic_mode) return;
 
-// static void error_at(ParseInfo& info, const char* message) {
-//   if (parser.panic_mode) return;
+  parser.panic_mode = true;
+  fprintf(stderr, "[line %d] Error", info->line);
 
-//   parser.panic_mode = true;
-//   fprintf(stderr, "[line %d] Error", info.line);
+  if (info->token == TOKEN_EOF) {
+    fprintf(stderr, " at end");
+  } else if (info->token == TOKEN_ERROR) {
+    // Nothing.
+  } else {
+    int len = info->end - info->start;
+    fprintf(stderr, " at '%.*s'", len, info->start);
+  }
 
-//   if (info.token == Token::END_OF_FILE) {
-//     fprintf(stderr, " at end");
-//   } else if (info.token == Token::ERROR) {
-//     // Nothing.
-//   } else {
-//     string msg = string(info.start, info.end);
-//     fprintf(stderr, " at '%s'", msg.c_str());
-//   }
+  fprintf(stderr, ": %s\n", message);
+  parser.had_error = true;
+}
 
-//   fprintf(stderr, ": %s\n", message);
-//   parser.had_error = true;
-// }
+void error_at_current(const char* message) {
+  error_at(&parser.current, message);
+}
 
-// static void error_at_current(const char* message) {
-//   error_at(parser.current, message);
-// }
+void error(const char* message) { error_at(&parser.previous, message); }
 
-// static void error(const char* message) { error_at(parser.previous, message);
-// }
+void advance() {
+  parser.previous = parser.current;
 
-// static void advance() {
-//   parser.previous = parser.current;
+  while (true) {
+    parser.current.token = scan_token();
+    parser.current.start = get_scanner_start();
+    parser.current.end = get_scanner_current();
+    parser.current.line = get_scanner_line();
 
-//   while (true) {
-//     parser.current.token = scanner.next_token();
-//     parser.current.start = scanner.start;
-//     parser.current.end = scanner.current;
-//     parser.current.line = scanner.line;
+    if (parser.current.token != TOKEN_ERROR) break;
 
-//     if (parser.current.token != Token::ERROR) break;
+    error_at_current("ERROR!");
+  }
+}
 
-//     error_at_current("ERROR!");
-//   }
-// }
+void consume(Token token, const char* message) {
+  if (parser.current.token == token) {
+    advance();
+    return;
+  }
 
-// static void consume(Token token, const char* message) {
-//   if (parser.current.token == token) {
-//     advance();
-//     return;
-//   }
+  error_at_current(message);
+}
 
-//   error_at_current(message);
-// }
+void number() {
+  int len = parser.previous.end - parser.previous.start;
 
-// static void number() {
-//   int value = stoi(string(parser.previous.start, parser.previous.end));
+  char* substr = malloc(len + 1);
 
-//   code.push_back(OP::CONSTANT);
+  memcpy(substr, parser.previous.start, len);
+  substr[len] = '\0';
 
-//   uint8_t* bytep = static_cast<uint8_t*>(static_cast<void*>(&value));
+  int32_t value = atoi(substr);
 
-//   for (int i = 0; i < sizeof(value); i++) {
-//     code.push_back(bytep[i]);
-//   }
-// }
+  free(substr);
 
-// static void parse_prec(Prec precedence) {
-//   advance();
-//   ParseFn prefixRule = get_rule(parser.previous.token)->prefix;
+  write_code(OP_CONSTANT);
+  write_value(&value, sizeof(value));
+}
 
-//   if (prefixRule == NULL) {
-//     error("Expect expression.");
-//     return;
-//   }
+void parse_prec(Prec precedence) {
+  advance();
+  ParseFn prefixRule = get_rule(parser.previous.token)->prefix;
 
-//   prefixRule();
+  if (prefixRule == NULL) {
+    error("Expect expression.");
+    return;
+  }
 
-//   while (precedence <= get_rule(parser.current.token)->precedence) {
-//     advance();
+  prefixRule();
 
-//     ParseFn infixRule = get_rule(parser.previous.token)->infix;
-//     infixRule();
-//   }
-// }
+  while (precedence <= get_rule(parser.current.token)->precedence) {
+    advance();
 
-// static void expression() { parse_prec(PREC_ASSIGNMENT); }
+    ParseFn infixRule = get_rule(parser.previous.token)->infix;
+    infixRule();
+  }
+}
 
-// static void grouping() {
-//   expression();
-//   consume(Token::RIGHT_PAREN, "Expect ')' after expression.");
-// }
+void expression() { parse_prec(PREC_ASSIGNMENT); }
 
-// static void binary() {
-//   Token op = parser.previous.token;
-//   ParseRule* rule = get_rule(op);
-//   parse_prec((Prec)(rule->precedence + 1));
+void grouping() {
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+}
 
-//   switch (op) {
-//     case Token::PLUS:
-//       code.push_back(OP::ADD);
-//       break;
-//     case Token::MINUS:
-//       code.push_back(OP::SUBTRACT);
-//       break;
-//     case Token::STAR:
-//       code.push_back(OP::MULTIPLY);
-//       break;
-//     case Token::SLASH:
-//       code.push_back(OP::DIVIDE);
-//       break;
-//     default:
-//       return;  // Unreachable.
-//   }
-// }
+void binary() {
+  Token op = parser.previous.token;
+  ParseRule* rule = get_rule(op);
+  parse_prec((Prec)(rule->precedence + 1));
 
-// static void unary() {
-//   Token op = parser.previous.token;
+  switch (op) {
+    case TOKEN_PLUS:
+      write_code(OP_ADD);
+      break;
+    case TOKEN_MINUS:
+      write_code(OP_SUBTRACT);
+      break;
+    case TOKEN_STAR:
+      write_code(OP_MULTIPLY);
+      break;
+    case TOKEN_SLASH:
+      write_code(OP_DIVIDE);
+      break;
+    default:
+      return;  // Unreachable.
+  }
+}
 
-//   // Compile the operand.
-//   parse_prec(PREC_UNARY);
+void unary() {
+  Token op = parser.previous.token;
 
-//   // Emit the operator instruction.
-//   switch (op) {
-//     case Token::MINUS:
-//       code.push_back(OP::NEGATE);
-//       break;
-//     default:
-//       return;  // Unreachable.
-//   }
-// }
+  // Compile the operand.
+  parse_prec(PREC_UNARY);
 
-// unordered_map<Token, ParseRule> rules = {
-//     {Token::LEFT_PAREN, {grouping, NULL, PREC_NONE}},
-//     {Token::MINUS, {unary, binary, PREC_TERM}},
-//     {Token::PLUS, {NULL, binary, PREC_TERM}},
-//     {Token::SLASH, {NULL, binary, PREC_FACTOR}},
-//     {Token::STAR, {NULL, binary, PREC_FACTOR}},
-//     {Token::NUMBER, {number, NULL, PREC_NONE}},
-// };
-// ParseRule empty_rule = {NULL, NULL, PREC_NONE};
+  // Emit the operator instruction.
+  switch (op) {
+    case TOKEN_MINUS:
+      write_code(OP_NEGATE);
+      break;
+    default:
+      return;  // Unreachable.
+  }
+}
 
-// static ParseRule* get_rule(Token type) {
-//   if (rules.find(type) != rules.end()) return &rules[type];
+ParseRule rules[TOKEN_EOF + 1] = {
+    [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
+    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
+    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
+    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_NUMBER] = {number, NULL, PREC_NONE}};
 
-//   return &empty_rule;
-// }
+void init_rules() {
+  for (int i = 0; i < TOKEN_EOF + 1; i++) {
+    if (i == TOKEN_LEFT_PAREN || i == TOKEN_MINUS || i == TOKEN_PLUS ||
+        i == TOKEN_SLASH || i == TOKEN_STAR || i == TOKEN_NUMBER) {
+      continue;
+    }
+
+    rules[i].prefix = NULL;
+    rules[i].infix = NULL;
+    rules[i].precedence = PREC_NONE;
+  }
+}
+
+ParseRule* get_rule(Token type) { return &rules[type]; }
 
 void compile(const char* source) {
   init_scanner(source);
+  init_rules();
 
-  int line = -1;
+  parser.had_error = false;
+  parser.panic_mode = false;
 
-  for (;;) {
-    Token token = scan_token();
+  free_code();
 
-    int scanner_line = get_scanner_line();
-    const char* start = get_scanner_start();
-    const char* current = get_scanner_current();
-    int len = current - start;
+  advance();
+  expression();
+  consume(TOKEN_EOF, "Expect end of expression.");
 
-    if (scanner_line != line) {
-      printf("%4d ", scanner_line);
-      line = scanner_line;
-    } else {
-      printf("   | ");
-    }
+  write_code(OP_RETURN);
 
-    if (token == TOKEN_EOF) {
-      printf("EOF\n");
+  log_code();
 
-      break;
-    } else if (token == TOKEN_ERROR) {
-      printf("Unexpected Token.\n");
-    } else {
-      printf("%2d '%.*s'\n", token, len, start);
-    }
-  }
+  // for (int i = 0; i < get_code_size(); i++) {
+  //   printf("%d\n", get_code()[i]);
+  // }
+
+  // int line = -1;
+
+  // for (;;) {
+  //   Token token = scan_token();
+
+  //   int scanner_line = get_scanner_line();
+  //   const char* start = get_scanner_start();
+  //   const char* current = get_scanner_current();
+  //   int len = current - start;
+
+  //   if (scanner_line != line) {
+  //     printf("%4d ", scanner_line);
+  //     line = scanner_line;
+  //   } else {
+  //     printf("   | ");
+  //   }
+
+  //   if (token == TOKEN_EOF) {
+  //     printf("EOF\n");
+
+  //     break;
+  //   } else if (token == TOKEN_ERROR) {
+  //     printf("Unexpected Token.\n");
+  //   } else {
+  //     printf("%2d '%.*s'\n", token, len, start);
+  //   }
+  // }
 }
