@@ -218,37 +218,5 @@ void compile(const char* source) {
 
   write_code(OP_RETURN);
 
-  log_code();
-
-  // for (int i = 0; i < get_code_size(); i++) {
-  //   printf("%d\n", get_code()[i]);
-  // }
-
-  // int line = -1;
-
-  // for (;;) {
-  //   Token token = scan_token();
-
-  //   int scanner_line = get_scanner_line();
-  //   const char* start = get_scanner_start();
-  //   const char* current = get_scanner_current();
-  //   int len = current - start;
-
-  //   if (scanner_line != line) {
-  //     printf("%4d ", scanner_line);
-  //     line = scanner_line;
-  //   } else {
-  //     printf("   | ");
-  //   }
-
-  //   if (token == TOKEN_EOF) {
-  //     printf("EOF\n");
-
-  //     break;
-  //   } else if (token == TOKEN_ERROR) {
-  //     printf("Unexpected Token.\n");
-  //   } else {
-  //     printf("%2d '%.*s'\n", token, len, start);
-  //   }
-  // }
+  // log_code();
 }

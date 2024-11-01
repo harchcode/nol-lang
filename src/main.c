@@ -5,6 +5,7 @@
 #include "bytecode.h"
 #include "common.h"
 #include "compiler.h"
+#include "vm.h"
 
 void repl() {
   char line[1024];
@@ -54,12 +55,14 @@ void run_file(const char* path) {
   char* source = read_file(path);
 
   compile(source);
+  run_code(get_code());
 
   free(source);
 }
 
 int main(int argc, char** argv) {
   init_code();
+  init_vm();
 
   if (argc == 1) {
     repl();
@@ -69,4 +72,7 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Usage: nol [path]\n");
     exit(64);
   }
+
+  free_vm();
+  free_code();
 }
