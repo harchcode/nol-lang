@@ -48,6 +48,18 @@ void log_instruction(uint8_t* code, int* offset) {
       return log_simple("OP_DIVIDE", offset);
     case OP_NEGATE:
       return log_simple("OP_NEGATE", offset);
+    case OP_TRUE:
+      return log_simple("OP_TRUE", offset);
+    case OP_FALSE:
+      return log_simple("OP_FALSE", offset);
+    case OP_NOT:
+      return log_simple("OP_NOT", offset);
+    case OP_EQUAL:
+      return log_simple("OP_EQUAL", offset);
+    case OP_GREATER:
+      return log_simple("OP_GREATER", offset);
+    case OP_LESS:
+      return log_simple("OP_LESS", offset);
     case OP_RETURN:
       return log_simple("OP_RETURN", offset);
     default:

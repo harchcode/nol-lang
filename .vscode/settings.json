@@ -42,6 +42,18 @@
     "string_view": "c",
     "__bit_reference": "c",
     "__split_buffer": "c",
-    "vector": "c"
+    "vector": "c",
+    "__node_handle": "cpp",
+    "atomic": "cpp",
+    "bitset": "cpp",
+    "__memory": "cpp",
+    "limits": "cpp",
+    "locale": "cpp",
+    "optional": "cpp",
+    "ratio": "cpp",
+    "system_error": "cpp",
+    "tuple": "cpp",
+    "type_traits": "cpp",
+    "cstddef": "cpp"
   }
 }

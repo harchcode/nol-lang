@@ -19,6 +19,7 @@ void repl() {
     }
 
     compile(line);
+    run_code(get_code());
   }
 }
 

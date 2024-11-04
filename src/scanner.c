@@ -90,7 +90,7 @@ Token number_token() {
 Token check_keyword(int check_start, int length, const char* rest,
                     Token token) {
   if (current - start == check_start + length &&
-      memcmp(&start + check_start, rest, length) == 0) {
+      memcmp(start + check_start, rest, length) == 0) {
     return token;
   }
 

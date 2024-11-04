@@ -115,6 +115,19 @@ void number() {
   write_value(&value, sizeof(value));
 }
 
+void literal() {
+  switch (parser.previous.token) {
+    case TOKEN_FALSE:
+      write_code(OP_FALSE);
+      break;
+    case TOKEN_TRUE:
+      write_code(OP_TRUE);
+      break;
+    default:
+      return;  // Unreachable.
+  }
+}
+
 void parse_prec(Prec precedence) {
   advance();
   ParseFn prefixRule = get_rule(parser.previous.token)->prefix;
@@ -159,6 +172,27 @@ void binary() {
     case TOKEN_SLASH:
       write_code(OP_DIVIDE);
       break;
+    case TOKEN_BANG_EQUAL:
+      write_code(OP_EQUAL);
+      write_code(OP_NOT);
+      break;
+    case TOKEN_EQUAL_EQUAL:
+      write_code(OP_EQUAL);
+      break;
+    case TOKEN_GREATER:
+      write_code(OP_GREATER);
+      break;
+    case TOKEN_GREATER_EQUAL:
+      write_code(OP_LESS);
+      write_code(OP_NOT);
+      break;
+    case TOKEN_LESS:
+      write_code(OP_LESS);
+      break;
+    case TOKEN_LESS_EQUAL:
+      write_code(OP_GREATER);
+      write_code(OP_NOT);
+      break;
     default:
       return;  // Unreachable.
   }
@@ -175,6 +209,9 @@ void unary() {
     case TOKEN_MINUS:
       write_code(OP_NEGATE);
       break;
+    case TOKEN_BANG:
+      write_code(OP_NOT);
+      break;
     default:
       return;  // Unreachable.
   }
@@ -186,12 +223,24 @@ ParseRule rules[TOKEN_EOF + 1] = {
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_NUMBER] = {number, NULL, PREC_NONE}};
+    [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
+    [TOKEN_BANG] = {unary, NULL, PREC_NONE},
+    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON}};
 
 void init_rules() {
   for (int i = 0; i < TOKEN_EOF + 1; i++) {
     if (i == TOKEN_LEFT_PAREN || i == TOKEN_MINUS || i == TOKEN_PLUS ||
-        i == TOKEN_SLASH || i == TOKEN_STAR || i == TOKEN_NUMBER) {
+        i == TOKEN_SLASH || i == TOKEN_STAR || i == TOKEN_NUMBER ||
+        i == TOKEN_TRUE || i == TOKEN_FALSE || i == TOKEN_BANG ||
+        i == TOKEN_BANG_EQUAL || i == TOKEN_EQUAL_EQUAL || i == TOKEN_GREATER ||
+        i == TOKEN_GREATER_EQUAL || i == TOKEN_LESS || i == TOKEN_LESS_EQUAL) {
       continue;
     }
 
