@@ -110,10 +110,9 @@ bool run_code(uint8_t* code) {
         break;
       }
       case OP_EQUAL: {
-        ValueType operand_type;
-        memcpy(&operand_type, ip, sizeof(ValueType));
-
-        ip += sizeof(ValueType);
+        uint8_t operand_type;
+        memcpy(&operand_type, ip, 1);
+        ip++;
 
         switch (operand_type) {
           case VAL_INT: {
