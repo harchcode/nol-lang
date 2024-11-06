@@ -54,6 +54,14 @@
     "system_error": "cpp",
     "tuple": "cpp",
     "type_traits": "cpp",
-    "cstddef": "cpp"
+    "cstddef": "cpp",
+    "__hash_table": "c",
+    "array": "c",
+    "complex": "c",
+    "functional": "c",
+    "iterator": "c",
+    "memory_resource": "c",
+    "initializer_list": "c",
+    "unordered_map": "c"
   }
 }

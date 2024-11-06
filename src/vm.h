@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-#define STACK_MAX 256
+#define STACK_MAX 4096
 
 void init_vm();
 void free_vm();

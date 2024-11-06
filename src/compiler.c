@@ -7,6 +7,7 @@
 #include "common.h"
 #include "debug.h"
 #include "scanner.h"
+#include "value.h"
 
 typedef enum {
   PREC_NONE,
@@ -22,7 +23,7 @@ typedef enum {
   PREC_PRIMARY
 } Prec;
 
-typedef void (*ParseFn)();
+typedef ValueType (*ParseFn)(ValueType prev_type);
 
 typedef struct {
   ParseFn prefix;
@@ -99,7 +100,7 @@ void consume(Token token, const char* message) {
   error_at_current(message);
 }
 
-void number() {
+ValueType number() {
   int len = parser.previous.end - parser.previous.start;
 
   char* substr = malloc(len + 1);
@@ -113,108 +114,150 @@ void number() {
 
   write_code(OP_CONSTANT);
   write_value(&value, sizeof(value));
+
+  return VAL_INT;
 }
 
-void literal() {
+ValueType literal() {
   switch (parser.previous.token) {
     case TOKEN_FALSE:
       write_code(OP_FALSE);
-      break;
+      return VAL_BOOL;
     case TOKEN_TRUE:
       write_code(OP_TRUE);
-      break;
+      return VAL_BOOL;
     default:
-      return;  // Unreachable.
+      return VAL_VOID;  // Unreachable.
   }
 }
 
-void parse_prec(Prec precedence) {
+ValueType parse_prec(Prec precedence) {
   advance();
   ParseFn prefixRule = get_rule(parser.previous.token)->prefix;
 
   if (prefixRule == NULL) {
     error("Expect expression.");
-    return;
+    return VAL_VOID;
   }
 
-  prefixRule();
+  ValueType prefix_type = prefixRule(VAL_VOID);
 
   while (precedence <= get_rule(parser.current.token)->precedence) {
     advance();
 
     ParseFn infixRule = get_rule(parser.previous.token)->infix;
-    infixRule();
+    prefix_type = infixRule(prefix_type);
   }
+
+  return prefix_type;
 }
 
-void expression() { parse_prec(PREC_ASSIGNMENT); }
+ValueType expression() { return parse_prec(PREC_ASSIGNMENT); }
 
-void grouping() {
-  expression();
+ValueType grouping() {
+  ValueType value_type = expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+  return value_type;
 }
 
-void binary() {
+bool is_number_type(ValueType val_type) { return val_type <= VAL_FLOAT; }
+
+ValueType binary(ValueType left_type) {
   Token op = parser.previous.token;
   ParseRule* rule = get_rule(op);
-  parse_prec((Prec)(rule->precedence + 1));
+  ValueType right_type = parse_prec((Prec)(rule->precedence + 1));
+
+  switch (op) {
+    case TOKEN_PLUS:
+    case TOKEN_MINUS:
+    case TOKEN_STAR:
+    case TOKEN_SLASH:
+    case TOKEN_GREATER:
+    case TOKEN_GREATER_EQUAL:
+    case TOKEN_LESS:
+    case TOKEN_LESS_EQUAL:
+      if (!is_number_type(left_type) || !is_number_type(right_type)) {
+        error("Expect a number.");
+      } else if (left_type != right_type) {
+        error("Expect operands to be of the same type.");
+      }
+      break;
+    case TOKEN_BANG_EQUAL:
+    case TOKEN_EQUAL_EQUAL:
+      if (left_type != right_type) {
+        error("Expect a matching type for equality comparison.");
+      }
+      break;
+    default:
+      break;
+  }
 
   switch (op) {
     case TOKEN_PLUS:
       write_code(OP_ADD);
-      break;
+      return VAL_INT;
     case TOKEN_MINUS:
       write_code(OP_SUBTRACT);
-      break;
+      return VAL_INT;
     case TOKEN_STAR:
       write_code(OP_MULTIPLY);
-      break;
+      return VAL_INT;
     case TOKEN_SLASH:
       write_code(OP_DIVIDE);
-      break;
+      return VAL_INT;
     case TOKEN_BANG_EQUAL:
       write_code(OP_EQUAL);
+      write_code(left_type);
       write_code(OP_NOT);
-      break;
+      return VAL_BOOL;
     case TOKEN_EQUAL_EQUAL:
       write_code(OP_EQUAL);
-      break;
+      write_code(left_type);
+      return VAL_BOOL;
     case TOKEN_GREATER:
       write_code(OP_GREATER);
-      break;
+      return VAL_BOOL;
     case TOKEN_GREATER_EQUAL:
       write_code(OP_LESS);
       write_code(OP_NOT);
-      break;
+      return VAL_BOOL;
     case TOKEN_LESS:
       write_code(OP_LESS);
-      break;
+      return VAL_BOOL;
     case TOKEN_LESS_EQUAL:
       write_code(OP_GREATER);
       write_code(OP_NOT);
-      break;
+      return VAL_BOOL;
     default:
-      return;  // Unreachable.
+      return VAL_VOID;  // Unreachable.
   }
 }
 
-void unary() {
+ValueType unary() {
   Token op = parser.previous.token;
 
   // Compile the operand.
-  parse_prec(PREC_UNARY);
+  ValueType val_type = parse_prec(PREC_UNARY);
 
   // Emit the operator instruction.
   switch (op) {
     case TOKEN_MINUS:
+      if (!is_number_type(val_type)) {
+        error("Expect a number.");
+      }
       write_code(OP_NEGATE);
       break;
     case TOKEN_BANG:
+      if (val_type != VAL_BOOL) {
+        error("Expect a boolean.");
+      }
       write_code(OP_NOT);
       break;
     default:
-      return;  // Unreachable.
+      break;  // Unreachable.
   }
+
+  return val_type;
 }
 
 ParseRule rules[TOKEN_EOF + 1] = {
