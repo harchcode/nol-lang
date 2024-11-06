@@ -305,10 +305,11 @@ void compile(const char* source) {
   free_code();
 
   advance();
-  expression();
+  ValueType val_type = expression();
   consume(TOKEN_EOF, "Expect end of expression.");
 
   write_code(OP_RETURN);
+  write_code(val_type);
 
   // log_code();
 }

@@ -107,6 +107,7 @@ bool run_code(uint8_t* code) {
         pop(bool, x);
         bool r = x == false;
         push(bool, r);
+
         break;
       }
       case OP_EQUAL: {
@@ -139,17 +140,48 @@ bool run_code(uint8_t* code) {
 
         break;
       }
-      case OP_GREATER:
-        BINARY_OP(bool, >);
-        break;
-      case OP_LESS:
-        BINARY_OP(bool, <);
-        break;
-      case OP_RETURN: {
-        bool value;
-        pop(bool, value);
+      case OP_GREATER: {
+        int32_t b;
+        pop(int32_t, b);
+        int32_t a;
+        pop(int32_t, a);
+        bool r = a > b;
+        push(bool, r);
 
-        printf(value ? "true" : "false");
+        break;
+      }
+      case OP_LESS: {
+        int32_t b;
+        pop(int32_t, b);
+        int32_t a;
+        pop(int32_t, a);
+        bool r = a < b;
+        push(bool, r);
+
+        break;
+      }
+      case OP_RETURN: {
+        uint8_t return_type;
+        memcpy(&return_type, ip, 1);
+        ip++;
+
+        switch (return_type) {
+          case VAL_INT: {
+            int32_t value;
+            pop(int32_t, value);
+
+            printf("%d", value);
+            break;
+          }
+          case VAL_BOOL: {
+            bool value;
+            pop(bool, value);
+
+            printf(value ? "true" : "false");
+            break;
+          }
+        }
+
         printf("\n");
 
         return true;
